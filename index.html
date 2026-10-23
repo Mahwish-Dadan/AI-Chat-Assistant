@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vibe Coding AI Assistant</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex">
+
+    <!-- Sidebar for History -->
+    <aside class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col p-4">
+        <h2 class="text-lg font-semibold mb-4 text-purple-400">Chat History</h2>
+        <div id="history-list" class="flex-1 overflow-y-auto space-y-2 text-sm text-gray-300">
+            <!-- Dynamically populated threads -->
+        </div>
+        <button onclick="startNewChat()" class="mt-4 bg-purple-600 hover:bg-purple-700 py-2 px-4 rounded text-sm font-medium transition">New Chat</button>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="flex-1 flex flex-col">
+        <!-- Header with Tone Toggle -->
+        <header class="bg-gray-800 border-b border-gray-700 p-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold">Vibe Chat Assistant</h1>
+            <div>
+                <label class="text-sm text-gray-400 mr-2">Tone:</label>
+                <select id="tone-select" class="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm focus:outline-none">
+                    <option value="Professional">Professional</option>
+                    <option value="Casual">Casual</option>
+                    <option value="Concise">Concise</option>
+                </select>
+            </div>
+        </header>
+
+        <!-- Chat Log -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-6 space-y-4">
+            <!-- Messages appear here -->
+        </div>
+
+        <!-- Input Box -->
+        <div class="bg-gray-800 border-t border-gray-700 p-4 flex gap-4">
+            <input type="text" id="user-input" placeholder="Type your message..." class="flex-1 bg-gray-700 border border-gray-600 rounded px-4 py-2 focus:outline-none focus:border-purple-500" onkeydown="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()" class="bg-purple-600 hover:bg-purple-700 px-6 py-2 rounded font-medium transition">Send</button>
+        </div>
+    </main>
+
+    <script>
+        let currentThreadId = "thread_" + Date.now();
+
+        async function sendMessage() {
+            const inputField = document.getElementById("user-input");
+            const prompt = inputField.value.trim();
+            const tone = document.getElementById("tone-select").value;
+            if (!prompt) return;
+
+            inputField.value = "";
+            appendMessage("User", prompt);
+
+            const aiMessageDiv = appendMessage("AI", "");
+
+            try {
+                const response = await fetch("http://localhost:8000/api/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ thread_id: currentThreadId, prompt: prompt, tone: tone })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullText = "";
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value, { stream: true });
+                    fullText += chunk;
+                    aiMessageDiv.innerText = fullText;
+                    aiMessageDiv.scrollIntoView({ behavior: 'smooth' });
+                }
+            } catch (error) {
+                aiMessageDiv.innerText = "Error connecting to backend.";
+            }
+        }
+
+        function appendMessage(sender, text) {
+            const container = document.getElementById("chat-container");
+            const bubble = document.createElement("div");
+            bubble.className = `p-3 rounded-lg max-w-xl ${sender === 'User' ? 'bg-purple-600 ml-auto' : 'bg-gray-700 mr-auto'}`;
+            bubble.innerText = text;
+            container.appendChild(bubble);
+            container.scrollTop = container.scrollHeight;
+            return bubble;
+        }
+
+        function startNewChat() {
+            currentThreadId = "thread_" + Date.now();
+            document.getElementById("chat-container").innerHTML = "";
+        }
+    </script>
+</body>
+</html>
